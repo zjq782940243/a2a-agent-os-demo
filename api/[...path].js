@@ -219,6 +219,20 @@ function getTask(idValue) {
   return state.tasks.get(idValue);
 }
 
+function publicTask(entry) {
+  const task = clone(entry.task);
+  // Serverless instances are not a durable task store. Include a compact event
+  // snapshot in the create response so the browser can render the run even if
+  // the next request lands on another instance.
+  task.liveEvents = entry.events.map((event) => ({
+    seq: event.seq,
+    type: event.type,
+    timestamp: event.timestamp,
+    task: { status: event.task.status },
+  }));
+  return task;
+}
+
 async function bodyJson(req) {
   if (req.body && typeof req.body === 'object') return req.body;
   let body = '';
@@ -243,7 +257,8 @@ module.exports = async function handler(req, res) {
     const payload = await bodyJson(req);
     const topic = String(payload.topic || '').trim();
     if (!topic) return sendJson(res, { error: 'topic_required' }, 422);
-    return sendJson(res, { task: runPipeline(topic) }, 202);
+    const task = runPipeline(topic);
+    return sendJson(res, { task: publicTask(state.tasks.get(task.id)) }, 202);
   }
   const match = route.match(/^\/tasks\/([^/]+)(?:\/(events|cancel|retry))?$/);
   if (!match) return sendJson(res, { error: 'not_found' }, 404);
@@ -270,7 +285,8 @@ module.exports = async function handler(req, res) {
   }
   if (req.method === 'POST' && action === 'retry') {
     if (!['failed', 'canceled'].includes(entry.task.status.state)) return sendJson(res, { error: 'retry_not_allowed' }, 409);
-    return sendJson(res, { task: runPipeline(entry.task.context.topic, taskId) }, 202);
+    const task = runPipeline(entry.task.context.topic, taskId);
+    return sendJson(res, { task: publicTask(state.tasks.get(task.id)) }, 202);
   }
   return sendJson(res, { error: 'method_not_allowed' }, 405);
 };
