@@ -253,6 +253,11 @@
       liveCount.textContent = String(liveEventItems.length);
       liveEvents.innerHTML = liveEventItems.map(item => `<div class="live-event"><span><code>${esc(item.type)}</code> · ${esc(item.state)}</span><time>${esc(fmtTime(item.timestamp))}</time></div>`).join('');
     }
+    function renderSnapshotEvents(task) {
+      const events = task?.liveEvents || [];
+      events.forEach(renderLiveEvent);
+      if (events.length) setStreamStatus('EVENT SNAPSHOT', 'connected');
+    }
     function closeStream() {
       if (eventSource) { eventSource.close(); eventSource = undefined; }
       clearInterval(fallbackTimer);
@@ -333,6 +338,8 @@
       const payload = await response.json();
       if (!response.ok || !payload.task) { setStreamStatus('SUBMIT FAILED', 'error'); button.disabled = false; return; }
       render(payload.task);
+      renderSnapshotEvents(payload.task);
+      if (Array.isArray(payload.task.liveEvents)) return;
       connectStream(payload.task.id);
     });
     cancelButton.addEventListener('click', async () => {
@@ -352,6 +359,8 @@
       retryButton.disabled = false;
       if (!response.ok || !payload.task) { setStreamStatus(payload.detail || 'RETRY FAILED', 'error'); return; }
       render(payload.task);
+      renderSnapshotEvents(payload.task);
+      if (Array.isArray(payload.task.liveEvents)) return;
       connectStream(payload.task.id);
     });
     renderPipeline(null);
