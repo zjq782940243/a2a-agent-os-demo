@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>A2A Agent Runtime Console</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #152238;
+      --muted: #6b7a90;
+      --line: #dce4ee;
+      --paper: #ffffff;
+      --canvas: #f2f5f8;
+      --blue: #2563eb;
+      --blue-soft: #eaf1ff;
+      --green: #15803d;
+      --green-soft: #e9f8ee;
+      --orange: #c2410c;
+      --orange-soft: #fff1e8;
+      --violet: #6d28d9;
+      --violet-soft: #f1edff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); }
+    header { background: #172033; color: #fff; border-bottom: 1px solid #263653; }
+    .topbar { max-width: 1240px; margin: 0 auto; padding: 24px 24px 22px; display: flex; justify-content: space-between; gap: 20px; align-items: flex-end; }
+    .eyebrow { color: #91a7c5; text-transform: uppercase; letter-spacing: .14em; font-size: 11px; font-weight: 700; }
+    h1 { margin: 8px 0 0; font-size: 28px; letter-spacing: -.02em; }
+    .header-note { max-width: 360px; color: #b9c6d8; font-size: 13px; line-height: 1.5; text-align: right; }
+    main { max-width: 1240px; margin: 0 auto; padding: 20px 24px 56px; display: grid; gap: 14px; }
+    .surface { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; }
+    .command { padding: 16px; display: flex; align-items: center; gap: 14px; }
+    .command-label { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; white-space: nowrap; }
+    form { flex: 1; display: flex; gap: 8px; }
+    input { width: 100%; min-width: 0; border: 1px solid #c6d2e0; border-radius: 6px; padding: 10px 12px; color: var(--ink); background: #fbfcfe; font-size: 14px; }
+    button { border: 0; border-radius: 6px; background: var(--blue); color: #fff; padding: 0 18px; font-size: 14px; font-weight: 700; cursor: pointer; min-height: 40px; white-space: nowrap; }
+    button.secondary { background: #eef2f7; color: #46556b; border: 1px solid #d6dfeb; }
+    button.danger { background: #b42318; color: #fff; }
+    button.hidden { display: none; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .run-meta { min-width: 175px; text-align: right; color: var(--muted); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .state { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 4px 8px; background: #e8edf3; color: #526176; font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .state::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .state.working { color: var(--blue); background: var(--blue-soft); } .state.completed { color: var(--green); background: var(--green-soft); } .state.failed { color: #b91c1c; background: #feecec; }
+    .section-head { padding: 16px 18px 0; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    h2 { margin: 0; font-size: 16px; } h3 { margin: 0; font-size: 13px; } .caption { color: var(--muted); font-size: 12px; }
+    .pipeline { padding: 18px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; }
+    .stage-wrap { display: flex; align-items: center; min-width: 0; }
+    .stage { flex: 1; min-height: 132px; border: 1px solid var(--line); border-radius: 8px; padding: 14px; position: relative; background: #fbfcfe; }
+    .stage.active { border-color: #7aa5f5; box-shadow: 0 0 0 3px #e7efff; }
+    .stage.done { border-color: #83c99a; background: #fbfffc; }
+    .stage-num { color: var(--muted); font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .stage-icon { width: 30px; height: 30px; border-radius: 6px; margin: 9px 0 12px; display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 800; }
+    .stage:nth-child(1) .stage-icon { background: #475569; } .stage:nth-child(2) .stage-icon { background: var(--orange); } .stage:nth-child(3) .stage-icon { background: var(--blue); } .stage:nth-child(4) .stage-icon { background: var(--violet); } .stage:nth-child(5) .stage-icon { background: var(--green); }
+    .stage-name { font-size: 13px; font-weight: 800; } .stage-role { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+    .stage-tag { display: inline-block; margin-top: 10px; padding: 3px 6px; border-radius: 4px; background: #edf1f6; color: #536278; font: 700 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .connector { width: 24px; height: 1px; background: #a9b8c9; position: relative; flex: 0 0 24px; }
+    .connector::after { content: ""; position: absolute; right: 0; top: -3px; border-left: 5px solid #a9b8c9; border-top: 3px solid transparent; border-bottom: 3px solid transparent; }
+    .stage-flow { margin-top: 8px; color: var(--muted); font-size: 10px; }
+    .triple { display: grid; grid-template-columns: 1.05fr 1.05fr .9fr; gap: 14px; }
+    .panel { min-height: 280px; overflow: hidden; }
+    .panel-body { padding: 14px 18px 18px; }
+    .wire-grid { display: grid; gap: 8px; }
+    .wire-item { border: 1px solid var(--line); border-left: 3px solid var(--blue); border-radius: 5px; padding: 10px; background: #fbfcfe; }
+    .wire-item.task { border-left-color: var(--orange); } .wire-item.artifact { border-left-color: var(--green); }
+    .wire-top { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+    .wire-type { font: 800 11px ui-monospace, SFMono-Regular, Menlo, monospace; } .wire-endpoint { color: var(--muted); font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .wire-copy { margin-top: 6px; color: #536278; font-size: 11px; line-height: 1.45; }
+    details.inspect { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 9px; }
+    details.inspect summary { cursor: pointer; color: #46556b; font-size: 11px; font-weight: 800; }
+    details.inspect pre { margin-top: 8px; max-height: 260px; font-size: 10px; line-height: 1.45; }
+    .json-tree { margin-top: 8px; max-height: 360px; overflow: auto; color: #334155; background: #f8fafc; border: 1px solid var(--line); border-radius: 6px; padding: 9px 10px; font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .json-node { margin: 2px 0; }
+    .json-node > summary { cursor: pointer; list-style-position: outside; padding: 2px 3px; border-radius: 3px; }
+    .json-node > summary:hover { background: #edf3fb; }
+    .json-node > summary::marker { color: #64748b; }
+    .json-children { margin-left: 15px; padding-left: 8px; border-left: 1px solid #d8e1ec; }
+    .json-leaf { padding: 2px 3px; overflow-wrap: anywhere; }
+    .json-key { color: #1d4ed8; }
+    .json-colon { color: #94a3b8; margin: 0 3px; }
+    .json-type { color: #64748b; font-size: 10px; margin-left: 7px; }
+    .json-string { color: #047857; }
+    .json-number { color: #b45309; }
+    .json-boolean { color: #7c3aed; }
+    .json-null { color: #64748b; font-style: italic; }
+    .op-list { display: grid; gap: 6px; margin-top: 8px; }
+    .op { border: 1px solid var(--line); border-radius: 4px; padding: 7px; font-size: 10px; line-height: 1.45; background: #fbfcfe; }
+    .op strong { color: var(--ink); } .op code { color: var(--blue); }
+    .memory-matches { margin-top: 4px; color: #536278; }
+    .memory-hit { display: block; padding: 2px 0 2px 8px; overflow-wrap: anywhere; }
+    .memory-hit::before { content: "- "; color: #94a3b8; }
+    .memory-score { color: #94a3b8; }
+    .runtime-list { display: grid; gap: 8px; }
+    .runtime-card { padding: 10px; border: 1px solid var(--line); border-radius: 5px; }
+    .runtime-card-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+    .runtime-label { font-size: 12px; font-weight: 800; } .runtime-id { color: var(--muted); font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 9px; }
+    .metric { background: #f4f7fa; border-radius: 4px; padding: 7px; } .metric b { display: block; font-size: 12px; } .metric span { color: var(--muted); font-size: 10px; }
+    .os-stack { display: grid; gap: 6px; }
+    .os-layer { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 5px; font-size: 11px; background: #f5f7fa; border-left: 3px solid #b9c5d4; }
+    .os-layer strong { font-size: 11px; } .os-layer small { color: var(--muted); font-size: 10px; text-align: right; } .os-layer.accent { background: var(--violet-soft); border-left-color: var(--violet); }
+    .lower-grid { display: grid; grid-template-columns: .85fr 1.15fr; gap: 14px; }
+    .timeline { padding: 15px 18px 18px; display: grid; gap: 7px; }
+    .event { display: grid; grid-template-columns: 74px 1fr auto; align-items: center; gap: 9px; border-left: 3px solid #c6d2e0; padding: 8px 9px; background: #fbfcfe; font-size: 11px; }
+    .event.working { border-left-color: var(--blue); } .event.completed { border-left-color: var(--green); } .event.failed, .event.canceled { border-left-color: #dc2626; }
+    .event-state { font: 800 10px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); } .event-msg { color: #46556b; } .event-time { color: #9aa8b9; font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .live-feed { margin: 0 18px 18px; border-top: 1px solid var(--line); padding-top: 10px; }
+    .live-feed-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--muted); font: 700 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .live-events { display: grid; gap: 4px; margin-top: 7px; max-height: 130px; overflow: auto; }
+    .live-event { display: flex; justify-content: space-between; gap: 8px; padding: 5px 7px; border-left: 2px solid #b9c5d4; background: #fbfcfe; color: #536278; font-size: 10px; }
+    .live-event code { color: var(--blue); } .live-event time { color: #9aa8b9; font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .stream-status { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font: 700 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .stream-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .stream-status.connected { color: var(--green); } .stream-status.connecting { color: var(--orange); } .stream-status.closed { color: var(--muted); } .stream-status.error { color: #b42318; }
+    .artifact-body { padding: 15px 18px 18px; }
+    pre { white-space: pre-wrap; margin: 0; max-height: 440px; overflow: auto; color: #334155; background: #f8fafc; border: 1px solid var(--line); border-radius: 6px; padding: 14px; font: 12px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .empty { color: #94a3b8; font-size: 12px; padding: 22px 0; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    @media (max-width: 980px) { .pipeline { grid-template-columns: 1fr; gap: 8px; } .stage-wrap { display: block; } .connector { width: 1px; height: 14px; margin: 0 auto; } .connector::after { right: -3px; top: auto; bottom: -1px; border: 3px solid transparent; border-top-color: #a9b8c9; } .triple, .lower-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 680px) { .topbar, .command { display: block; } .header-note { text-align: left; margin-top: 12px; } form { margin-top: 12px; } .run-meta { margin-top: 10px; text-align: left; } main { padding: 14px 12px 40px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <div><div class="eyebrow">Agent OS / A2A Lab</div><h1>Research pipeline console</h1></div>
+      <div class="header-note">一条任务，四个抽象层：通信、运行时、工作站能力、架构编排。</div>
+    </div>
+  </header>
+  <main>
+    <section class="surface command">
+      <div class="command-label">Research task</div>
+      <form id="task-form"><input id="topic" aria-label="研究主题" value="Agent OS、Pi、UniPi 与 A2A 如何组合" /><button id="submit" type="submit">Run pipeline</button><button id="cancel" class="danger hidden" type="button">Cancel</button><button id="retry" class="secondary hidden" type="button">Retry</button></form>
+      <div class="run-meta" id="task-meta">NO ACTIVE TASK</div>
+    </section>
+
+    <section class="surface">
+      <div class="section-head"><h2>调用拓扑</h2><span class="caption">orchestration path</span></div>
+      <div class="pipeline" id="pipeline">
+        <div class="stage-wrap"><div class="stage" data-stage="request"><div class="stage-num">01 / INPUT</div><div class="stage-icon">U</div><div class="stage-name">User request</div><div class="stage-role">主题与约束</div><span class="stage-tag">MESSAGE</span></div><div class="connector"></div></div>
+        <div class="stage-wrap"><div class="stage" data-stage="orchestrator"><div class="stage-num">02 / ROUTE</div><div class="stage-icon">O</div><div class="stage-name">Orchestrator</div><div class="stage-role">Agent OS · 调度与观测</div><span class="stage-tag">A2A CLIENT</span></div><div class="connector"></div></div>
+        <div class="stage-wrap"><div class="stage" data-stage="research"><div class="stage-num">03 / EXECUTE</div><div class="stage-icon">R</div><div class="stage-name">Research Agent</div><div class="stage-role">Pi · 本地资料工具</div><span class="stage-tag">TASK → ARTIFACT</span></div><div class="connector"></div></div>
+        <div class="stage-wrap"><div class="stage" data-stage="summary"><div class="stage-num">04 / SYNTHESIZE</div><div class="stage-icon">S</div><div class="stage-name">Summary Agent</div><div class="stage-role">Pi · 结构化总结</div><span class="stage-tag">TASK → ARTIFACT</span></div><div class="connector"></div></div>
+        <div class="stage-wrap"><div class="stage" data-stage="artifact"><div class="stage-num">05 / OUTPUT</div><div class="stage-icon">A</div><div class="stage-name">Final artifact</div><div class="stage-role">Markdown 报告</div><span class="stage-tag">DELIVERABLE</span></div></div>
+      </div>
+    </section>
+
+    <div class="triple">
+      <section class="surface panel"><div class="section-head"><h2>A2A wire</h2><span class="caption">protocol objects</span></div><div class="panel-body"><div class="wire-grid" id="wire"><div class="empty">提交任务后显示 Message / Task / Artifact</div></div><details class="inspect"><summary>查看 A2A 原始报文</summary><div id="protocol" class="json-tree" aria-label="A2A 原始 JSON 报文"></div></details><details class="inspect"><summary>查看工具与记忆事件</summary><div class="op-list" id="operations"><div class="empty">暂无事件</div></div></details></div></section>
+      <section class="surface panel"><div class="section-head"><h2>Pi runtime</h2><span class="caption">internal execution</span></div><div class="panel-body"><div class="runtime-list" id="runtime"><div class="empty">等待 Agent runtime telemetry</div></div></div></section>
+      <section class="surface panel"><div class="section-head"><h2>Agent OS map</h2><span class="caption">composition layers</span></div><div class="panel-body"><div class="os-stack"><div class="os-layer accent"><strong>Runtime</strong><small>Pi / Agent loop</small></div><div class="os-layer"><strong>Tools & permissions</strong><small>host-controlled</small></div><div class="os-layer accent"><strong>Memory / workflow</strong><small>UniPi installed / optional</small></div><div class="os-layer"><strong>Scheduling</strong><small>Orchestrator</small></div><div class="os-layer"><strong>Observability</strong><small>Task history</small></div><div class="os-layer accent"><strong>Inter-agent</strong><small>A2A</small></div></div></div></section>
+    </div>
+
+    <div class="lower-grid">
+      <section class="surface"><div class="section-head"><h2>Task lifecycle</h2><span class="stream-status closed" id="stream-status">EVENT STREAM OFFLINE</span></div><div class="timeline" id="timeline"><div class="empty">NO TASK HISTORY</div></div><div class="live-feed"><div class="live-feed-head"><span>LIVE EVENTS</span><span id="live-count">0</span></div><div class="live-events" id="live-events"><div class="empty">等待 SSE 事件</div></div></div></section>
+      <section class="surface"><div class="section-head"><h2>Artifact preview</h2><span class="caption" id="artifact-meta">final-report.md</span></div><div class="artifact-body" id="artifact"><div class="empty">等待总结 Agent 返回报告</div></div></section>
+    </div>
+  </main>
+  <script>
+    const form = document.getElementById('task-form');
+    const input = document.getElementById('topic');
+    const button = document.getElementById('submit');
+    const cancelButton = document.getElementById('cancel');
+    const retryButton = document.getElementById('retry');
+    const meta = document.getElementById('task-meta');
+    const timeline = document.getElementById('timeline');
+    const artifact = document.getElementById('artifact');
+    const artifactMeta = document.getElementById('artifact-meta');
+    const wire = document.getElementById('wire');
+    const runtime = document.getElementById('runtime');
+    const protocol = document.getElementById('protocol');
+    const operations = document.getElementById('operations');
+    const streamStatus = document.getElementById('stream-status');
+    const liveEvents = document.getElementById('live-events');
+    const liveCount = document.getElementById('live-count');
+    let eventSource;
+    let fallbackTimer;
+    let currentTaskId;
+    let liveEventItems = [];
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const fmtTime = (iso) => iso ? new Date(iso).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'}) : '--:--:--';
+    const fmtNum = (value) => typeof value === 'number' ? value.toLocaleString() : '—';
+    function jsonPrimitive(value) {
+      if (value === null) return '<span class="json-null">null</span>';
+      if (typeof value === 'string') return `<span class="json-string">&quot;${esc(value)}&quot;</span>`;
+      if (typeof value === 'number') return `<span class="json-number">${esc(value)}</span>`;
+      if (typeof value === 'boolean') return `<span class="json-boolean">${value}</span>`;
+      return `<span>${esc(value)}</span>`;
+    }
+    function jsonLabel(key) {
+      if (key === undefined) return '<span class="json-key">root</span>';
+      return `<span class="json-key">${esc(key)}</span><span class="json-colon">:</span>`;
+    }
+    function jsonNode(value, key, depth = 0) {
+      const isArray = Array.isArray(value);
+      const isObject = value !== null && typeof value === 'object';
+      if (!isObject) return `<div class="json-leaf">${jsonLabel(key)} ${jsonPrimitive(value)}</div>`;
+      const entries = isArray ? value.map((item, index) => [index, item]) : Object.entries(value);
+      const kind = isArray ? 'array' : 'object';
+      const open = depth === 0 ? ' open' : '';
+      const children = entries.length ? entries.map(([childKey, childValue]) => jsonNode(childValue, childKey, depth + 1)).join('') : '<div class="json-leaf"><span class="json-null">empty</span></div>';
+      return `<details class="json-node"${open}><summary>${jsonLabel(key)}<span class="json-type">${kind} · ${entries.length}</span></summary><div class="json-children">${children}</div></details>`;
+    }
+    function renderProtocol(value) {
+      protocol.innerHTML = jsonNode(value, undefined, 0);
+    }
+    function renderMemoryEvent(event) {
+      const operation = event.operation || 'unknown';
+      if (operation === 'search') {
+        const hits = event.hits || [];
+        const matches = hits.length ? hits.map(hit => `<span class="memory-hit">${esc(hit.topic || 'unknown')} <span class="memory-score">(score ${esc(hit.score ?? '—')})</span></span>`).join('') : '<span class="memory-hit">no matches</span>';
+        return `<div class="op"><strong>MEMORY</strong> <code>search</code> · ${esc(event.hitCount ?? hits.length)} hits<br>query: ${esc(event.query || '')}<div class="memory-matches">matched topics:${matches}</div></div>`;
+      }
+      if (operation === 'store') {
+        const memory = event.memory || {};
+        return `<div class="op"><strong>MEMORY</strong> <code>store</code> · ${esc(memory.id || '—')}<br>topic: ${esc(memory.topic || '')}<br>saved: SQLite memory record</div>`;
+      }
+      return `<div class="op"><strong>MEMORY</strong> <code>${esc(operation)}</code><br>${esc(event.query || event.memory?.topic || '')}</div>`;
+    }
+    function stageFor(task) {
+      const state = task?.status?.state;
+      const msg = task?.status?.message || '';
+      if (!task) return {active: 'request', done: []};
+      if (state === 'failed') return {active: msg.includes('研究') ? 'research' : 'summary', done: []};
+      if (state === 'completed') return {active: 'artifact', done: ['request','orchestrator','research','summary','artifact']};
+      if (msg.includes('总结')) return {active: 'summary', done: ['request','orchestrator','research']};
+      if (msg.includes('研究') || msg.includes('检索')) return {active: 'research', done: ['request','orchestrator']};
+      return {active: 'orchestrator', done: ['request']};
+    }
+    function renderPipeline(task) {
+      const flow = stageFor(task);
+      document.querySelectorAll('.stage').forEach(node => { node.classList.toggle('active', node.dataset.stage === flow.active); node.classList.toggle('done', flow.done.includes(node.dataset.stage)); });
+    }
+    function renderTimeline(task) {
+      const history = task?.history || [];
+      timeline.innerHTML = history.length ? history.map(e => `<div class="event ${esc(e.state)}"><span class="event-state">${esc(e.state)}</span><span class="event-msg">${esc(e.message || '状态更新')}</span><span class="event-time">${esc(fmtTime(e.timestamp))}</span></div>`).join('') : '<div class="empty">NO TASK HISTORY</div>';
+    }
+    function setStreamStatus(label, state) {
+      streamStatus.textContent = label;
+      streamStatus.className = `stream-status ${state}`;
+    }
+    function resetLiveEvents() {
+      liveEventItems = [];
+      liveCount.textContent = '0';
+      liveEvents.innerHTML = '<div class="empty">等待 SSE 事件</div>';
+    }
+    function renderLiveEvent(packet) {
+      const state = packet.task?.status?.state || 'unknown';
+      liveEventItems.push({type: packet.type || 'task.updated', state, timestamp: packet.timestamp});
+      liveEventItems = liveEventItems.slice(-18);
+      liveCount.textContent = String(liveEventItems.length);
+      liveEvents.innerHTML = liveEventItems.map(item => `<div class="live-event"><span><code>${esc(item.type)}</code> · ${esc(item.state)}</span><time>${esc(fmtTime(item.timestamp))}</time></div>`).join('');
+    }
+    function closeStream() {
+      if (eventSource) { eventSource.close(); eventSource = undefined; }
+      clearInterval(fallbackTimer);
+    }
+    function poll(id) {
+      fetch(`/api/tasks/${encodeURIComponent(id)}`).then(response => response.ok ? response.json() : null).then(payload => { if (payload?.task) render(payload.task); }).catch(() => {});
+    }
+    function connectStream(id) {
+      closeStream();
+      currentTaskId = id;
+      setStreamStatus('SSE CONNECTING', 'connecting');
+      if (!window.EventSource) {
+        setStreamStatus('POLLING FALLBACK', 'error');
+        fallbackTimer = setInterval(() => poll(id), 300);
+        return;
+      }
+      eventSource = new EventSource(`/api/tasks/${encodeURIComponent(id)}/events`);
+      eventSource.onopen = () => setStreamStatus('SSE LIVE', 'connected');
+      eventSource.onmessage = (event) => {
+        try {
+          const packet = JSON.parse(event.data);
+          if (packet.task) { renderLiveEvent(packet); render(packet.task); }
+        } catch (error) {
+          setStreamStatus('SSE PARSE ERROR', 'error');
+        }
+      };
+      eventSource.onerror = () => {
+        if (eventSource?.readyState === EventSource.CONNECTING) setStreamStatus('SSE RECONNECTING', 'connecting');
+        else if (eventSource?.readyState === EventSource.CLOSED) setStreamStatus('SSE CLOSED', 'closed');
+      };
+    }
+    function renderWire(task) {
+      if (!task) { wire.innerHTML = '<div class="empty">提交任务后显示 Message / Task / Artifact</div>'; renderProtocol([]); operations.innerHTML = '<div class="empty">暂无事件</div>'; return; }
+      const artifacts = task.artifacts || [];
+      const retryNote = task.context?.retryOf ? `<br>retry of: <code>${esc(task.context.retryOf)}</code>` : '';
+      const researchHop = (task.history || []).find(e => String(e.message || '').includes('研究 Agent 已接单'))?.message?.split('：').pop() || 'pending';
+      const summaryHop = (task.history || []).find(e => String(e.message || '').includes('总结 Agent 已接单'))?.message?.split('：').pop() || 'pending';
+      wire.innerHTML = `<div class="wire-item"><div class="wire-top"><span class="wire-type">MESSAGE</span><span class="wire-endpoint">user → orchestrator</span></div><div class="wire-copy">topic: ${esc(task.context?.topic || '—')}<br>method: <code>message/send</code></div></div><div class="wire-item task"><div class="wire-top"><span class="wire-type">TASK</span><span class="wire-endpoint">id: ${esc(task.id)}</span></div><div class="wire-copy">state: <code>${esc(task.status.state)}</code><br>history events: ${historyCount(task)}${retryNote}</div></div><div class="wire-item"><div class="wire-top"><span class="wire-type">A2A HOPS</span><span class="wire-endpoint">delegation chain</span></div><div class="wire-copy">orchestrator → research <code>${esc(researchHop)}</code><br>orchestrator → summary <code>${esc(summaryHop)}</code></div></div><div class="wire-item artifact"><div class="wire-top"><span class="wire-type">ARTIFACT</span><span class="wire-endpoint">${artifacts.length} returned</span></div><div class="wire-copy">${artifacts.map(a => esc(a.name)).join(' · ') || 'pending'}</div></div>`;
+      renderProtocol(task.protocol || []);
+      const toolEvents = task.toolEvents || [];
+      const memoryEvents = task.memoryEvents || [];
+      const opHtml = [...toolEvents.map(event => { const sourceText = event.output?.sourceCount === 0 ? `no relevant sources · ${event.output?.reason || 'no_match'}` : ((event.output?.paths || []).join(' · ') || '—'); return `<div class="op"><strong>TOOL</strong> <code>${esc(event.name || 'unknown')}</code> · ${esc(event.status || 'unknown')} · ${esc(event.durationMs || 0)}ms<br>sources: ${esc(sourceText)}</div>`; }), ...memoryEvents.map(renderMemoryEvent)].join('');
+      operations.innerHTML = opHtml || '<div class="empty">暂无事件</div>';
+    }
+    function historyCount(task) { return (task.history || []).length; }
+    function renderRuntime(task) {
+      const items = (task?.artifacts || []).filter(a => a.metadata?.pi || a.metadata?.runtime);
+      if (!items.length) { runtime.innerHTML = '<div class="empty">等待 Agent runtime telemetry</div>'; return; }
+      runtime.innerHTML = items.map((a, index) => { const p = a.metadata?.pi || {}; const usage = p.usage || {}; const eventNames = Object.keys(p.eventCounts || {}); const events = eventNames.length; return `<div class="runtime-card"><div class="runtime-card-head"><span class="runtime-label">${index === 0 ? 'Research Agent' : 'Summary Agent'}</span><span class="runtime-id">${esc(a.metadata?.runtime || 'mock')}</span></div><div class="metrics"><div class="metric"><b>${esc(p.model || 'mock')}</b><span>model</span></div><div class="metric"><b>${p.durationMs ? esc((p.durationMs / 1000).toFixed(1) + 's') : '—'}</b><span>duration</span></div><div class="metric"><b>${esc(events || '—')}</b><span>event types</span></div></div><div class="wire-copy">provider: ${esc(p.provider || '—')} · tools: ${esc(p.tools || '—')} · tokens: ${fmtNum(usage.totalTokens)}</div><div class="wire-copy">events: ${esc(eventNames.join(' · ') || '—')}</div></div>`; }).join('');
+    }
+    function renderArtifact(task) {
+      const final = (task?.artifacts || []).find(a => a.name === 'final-report.md');
+      if (!final) { artifact.innerHTML = '<div class="empty">等待总结 Agent 返回报告</div>'; artifactMeta.textContent = 'final-report.md'; return; }
+      artifactMeta.textContent = `${final.name} · ${final.metadata?.runtime || 'mock'}`;
+      artifact.innerHTML = `<pre>${esc(final.parts?.[0]?.text || '')}</pre>`;
+    }
+    function render(task) {
+      const state = task?.status?.state;
+      if (!task) { meta.textContent = 'NO ACTIVE TASK'; return; }
+      meta.innerHTML = `<span class="state ${esc(state)}">${esc(state)}</span><br><span>${esc(task.id)}</span>`;
+      renderPipeline(task); renderTimeline(task); renderWire(task); renderRuntime(task); renderArtifact(task);
+      const terminal = state === 'completed' || state === 'failed' || state === 'canceled';
+      button.disabled = !terminal;
+      cancelButton.classList.toggle('hidden', terminal);
+      cancelButton.disabled = false;
+      retryButton.classList.toggle('hidden', !(state === 'failed' || state === 'canceled'));
+      if (terminal) {
+        closeStream();
+        setStreamStatus(state === 'completed' ? 'SSE COMPLETE' : `SSE ${state.toUpperCase()}`, state === 'completed' ? 'connected' : 'closed');
+      }
+    }
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      button.disabled = true;
+      retryButton.classList.add('hidden');
+      resetLiveEvents();
+      const response = await fetch('/api/tasks', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({topic:input.value})});
+      const payload = await response.json();
+      if (!response.ok || !payload.task) { setStreamStatus('SUBMIT FAILED', 'error'); button.disabled = false; return; }
+      render(payload.task);
+      connectStream(payload.task.id);
+    });
+    cancelButton.addEventListener('click', async () => {
+      if (!currentTaskId) return;
+      cancelButton.disabled = true;
+      setStreamStatus('CANCELING', 'connecting');
+      const response = await fetch(`/api/tasks/${encodeURIComponent(currentTaskId)}/cancel`, {method:'POST'});
+      const payload = await response.json();
+      if (payload.task) render(payload.task);
+    });
+    retryButton.addEventListener('click', async () => {
+      if (!currentTaskId) return;
+      retryButton.disabled = true;
+      resetLiveEvents();
+      const response = await fetch(`/api/tasks/${encodeURIComponent(currentTaskId)}/retry`, {method:'POST'});
+      const payload = await response.json();
+      retryButton.disabled = false;
+      if (!response.ok || !payload.task) { setStreamStatus(payload.detail || 'RETRY FAILED', 'error'); return; }
+      render(payload.task);
+      connectStream(payload.task.id);
+    });
+    renderPipeline(null);
+  </script>
+</body>
+</html>
