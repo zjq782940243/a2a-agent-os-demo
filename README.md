@@ -15,7 +15,7 @@ python3 start_demo.py
 
 ## Vercel 在线版
 
-仓库包含 `api/[...path].js` Vercel 适配层。它复用页面使用的 `/api/tasks`、Task、Artifact、Memory 和 SSE 契约，把三个本地 Python 服务压缩为一个可分享的 Serverless 函数。线上默认使用确定性本地资料适配器，不需要 API Key；这不是把 Pi 进程运行在 Vercel 上。需要真实 Pi + DeepSeek 时，请使用下面的本地启动脚本或部署到支持长期进程的 Railway、Render、Fly.io 等平台。
+仓库包含 `api/[...path].js` Vercel 适配层。它复用页面使用的 `/api/tasks`、Task、Artifact 和 Memory 契约，把三个本地 Python 服务压缩为一个可分享的 Serverless 函数。由于 Vercel 函数实例不保证跨请求共享内存，线上创建任务响应会附带 `liveEvents` 事件快照，页面据此展示完整调用链；本地 Python 版才提供可断线重连的真实 SSE TaskStore。线上默认使用确定性本地资料适配器，不需要 API Key；这不是把 Pi 进程运行在 Vercel 上。需要真实 Pi + DeepSeek 时，请使用下面的本地启动脚本或部署到支持长期进程的 Railway、Render、Fly.io 等平台。
 
 部署步骤：
 
